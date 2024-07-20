@@ -2,7 +2,7 @@ from src.pose_detector import PoseDetector
 from src.cv2_utils import live_feed
 from src.strikes.speed_jab import SpeedJab
 
-def render_pose(detector, frame):
+def render_pose(detector: PoseDetector, frame):
     return detector.process_frame_and_landmarks(frame)
 
 def main():

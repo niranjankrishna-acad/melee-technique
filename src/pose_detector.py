@@ -10,7 +10,8 @@ class PoseDetector:
 
     def process_landmarks(self, frame):
         results = self._process(frame)
-        return results.pose_landmarks
+        landmarks = results.pose_landmarks.landmark if results.pose_landmarks else None
+        return landmarks
 
     def process_frame(self, frame):
         results = self._process(frame)
@@ -20,7 +21,9 @@ class PoseDetector:
     def process_frame_and_landmarks(self, frame):
         results = self._process(frame)
         image = self._draw_landmarks(frame, results.pose_landmarks)
-        return image, results.pose_landmarks
+
+        landmarks = results.pose_landmarks.landmark if results.pose_landmarks else None
+        return image, landmarks
 
     def _process(self, frame):
         image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
