@@ -3,11 +3,14 @@ import mediapipe as mp
 from sklearn.cluster import KMeans
 import pickle
 
+PARENT_DIR = "src/strikes"
+
 mp_pose = mp.solutions.pose
 
 class Jab:
     def __init__(self):
         self.keypoints = []
+        self.labels = ["Non-Jab", "Jab"]
 
     def select_landmarks(self, landmarks):
         # Select left shoulder, left elbow, and left wrist landmarks
@@ -41,7 +44,7 @@ class Jab:
         normalized = self.normalize_landmarks(selected)
         self.keypoints.append(normalized)
 
-    def save_keypoints(self, filename='src/recorder/data/jab_strikes.npy'):
+    def save_keypoints(self, filename=f'{PARENT_DIR}/data/jab_strikes.npy'):
         np.save(filename, self.keypoints)
 
     def extract_features(self):
@@ -59,12 +62,12 @@ class Jab:
     def train_kmeans(self, n_clusters=2):
         features = self.extract_features()
         kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(features)
-        with open('src/recorder/data/jab_kmeans.pkl', 'wb') as f:
+        with open(f'{PARENT_DIR}/data/jab_kmeans.pkl', 'wb') as f:
             pickle.dump(kmeans, f)
         print("K-Means model trained and saved.")
 
     def load_kmeans(self):
-        with open('src/recorder/data/jab_kmeans.pkl', 'rb') as f:
+        with open(f'{PARENT_DIR}/data/jab_kmeans.pkl', 'rb') as f:
             self.kmeans = pickle.load(f)
 
     def infer(self, landmarks):
@@ -75,3 +78,10 @@ class Jab:
                               normalized['LEFT_WRIST']['x'], normalized['LEFT_WRIST']['y'], normalized['LEFT_WRIST']['z']]])
         label = self.kmeans.predict(features)[0]
         return label
+
+    def is_strike(self, label_window):
+        prev_label, cur_label = label_window[-2], label_window[-1]
+        if prev_label == "Non-Jab" and cur_label == "Jab":
+            return True
+        
+        return False

@@ -6,7 +6,7 @@ import mediapipe as mp
 
 mp_pose = mp.solutions.pose
 
-def live_feed(render_pose, detector: PoseDetector, technique_list, window_name="Video Feed", enable_3d_view=False):
+def live_feed(detector: PoseDetector, technique_list, window_name="Video Feed", enable_3d_view=False):
     cap = cv2.VideoCapture(0)
     fig, ax = None, None
 
@@ -22,7 +22,7 @@ def live_feed(render_pose, detector: PoseDetector, technique_list, window_name="
         if not ret:
             continue
 
-        processed_frame, landmarks = render_pose(detector, frame)
+        processed_frame, landmarks = detector.process_frame_and_landmarks(frame)
         if landmarks:
             for technique in technique_list:
                 technique.check(landmarks)

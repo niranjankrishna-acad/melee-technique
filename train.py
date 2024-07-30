@@ -7,19 +7,16 @@ import time
 import numpy as np
 import mediapipe as mp
 from src.pose_detector import PoseDetector
-from src.strikes.speed_jab import SpeedJab
-from src.strikes.punch import Punch
-from src.recorder import technique_dict
+from src.strikes import technique_dict
 
 mp_pose = mp.solutions.pose
 
 class App:
-    def __init__(self, window, window_title, render_pose, detector, technique_list, video_source=0):
+    def __init__(self, window, window_title, detector, technique_list, video_source=0):
         self.window = window
         self.window.title(window_title)
         self.video_source = video_source
-        self.render_pose = render_pose
-        self.detector = detector
+        self.detector: PoseDetector = detector
         self.technique_list = technique_list
 
         self.vid = cv2.VideoCapture(self.video_source)
@@ -30,7 +27,7 @@ class App:
         self.prev_label = None  # To store the previous label for transition detection
 
         # Recorder for the selected technique
-        self.technique_recorder = None
+        self.technique= None
         self.current_label = None
 
         # Create a canvas for the video feed
@@ -47,7 +44,7 @@ class App:
         self.dropdown['values'] = list(technique_dict.keys())
         self.dropdown.current(0)
         self.dropdown.grid(row=0, column=0, pady=5)
-        self.technique_list_var.trace('w', self.update_technique_recorder)
+        self.technique_list_var.trace('w', self.update_technique)
 
         # Record button
         self.record_button = tk.Button(self.controls_frame, text="Start 30 sec Record", command=self.start_recording)
@@ -70,14 +67,13 @@ class App:
         self.punch_counter_label = tk.Label(self.controls_frame, text="Punch Count: 0")
         self.punch_counter_label.grid(row=5, column=0, pady=5)
 
-        self.update_technique_recorder()
+        self.update_technique()
         self.update()
         self.window.mainloop()
 
-    def update_technique_recorder(self, *args):
+    def update_technique(self, *args):
         selected_technique = self.technique_list_var.get()
-        self.technique_recorder = technique_dict[selected_technique]()
-        self.labels = ["Non-Jab", "Jab"]
+        self.technique = technique_dict[selected_technique]()
 
     def start_recording(self):
         self.recording = True
@@ -101,35 +97,35 @@ class App:
             ret, frame = self.vid.read()
             if not ret:
                 break
-            frame, landmarks = self.render_pose(self.detector, frame)
+            frame, landmarks = self.detector.process_frame_and_landmarks(frame)
             if landmarks:
-                self.technique_recorder.record_landmarks(landmarks)
+                self.technique.record_landmarks(landmarks)
             self.photo = ImageTk.PhotoImage(image=Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)))
             self.canvas.create_image(0, 0, image=self.photo, anchor=tk.NW)
             self.status_label.config(text=f"Recording... {int(self.recording_time - (time.time() - start_time))}")
             self.window.update_idletasks()
             self.window.update()
 
-        self.technique_recorder.save_keypoints('src/recorder/data/jab_strikes.npy')
+        self.technique.save_keypoints()
         self.status_label.config(text="Status: Recording Completed")
         self.recording = False
         self.countdown = 3
 
     def train_kmeans(self):
-        if self.technique_recorder:
+        if self.technique:
             self.status_label.config(text="Training...")
             threading.Thread(target=self.run_kmeans_training).start()
         else:
             print("No technique recorder selected.")
 
     def run_kmeans_training(self):
-        self.technique_recorder.train_kmeans()
+        self.technique.train_kmeans()
         self.status_label.config(text="Training Complete")
 
     def start_inference(self):
-        if self.technique_recorder:
+        if self.technique:
             self.status_label.config(text="Loading K-Means Model...")
-            self.technique_recorder.load_kmeans()
+            self.technique.load_kmeans()
             self.status_label.config(text="Inference Mode")
             self.inference_mode = True
         else:
@@ -141,15 +137,16 @@ class App:
             if ret:
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 if self.inference_mode:
-                    _, landmarks = self.render_pose(self.detector, frame)
+                    _, landmarks = self.detector.process_frame_and_landmarks(frame)
                     if landmarks:
-                        label = self.technique_recorder.infer(landmarks)
-                        self.current_label = self.labels[label]
+                        label = self.technique.infer(landmarks)
+                        self.current_label = self.technique.labels[label]
                         print(f"Inference label: {self.current_label}")  # Debug print
                         cv2.putText(frame, self.current_label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
-
+                        
+                        is_strike = self.technique.is_strike([self.prev_label, self.current_label])
                         # Punch counter logic: count a punch when transitioning from "Non-Jab" to "Jab"
-                        if self.prev_label == "Non-Jab" and self.current_label == "Jab":
+                        if is_strike:
                             self.punch_count += 1
                             self.punch_counter_label.config(text=f"Punch Count: {self.punch_count}")
 
@@ -163,17 +160,12 @@ class App:
         if self.vid.isOpened():
             self.vid.release()
 
-def render_pose(detector: PoseDetector, frame):
-    return detector.process_frame_and_landmarks(frame)
-
 def main():
     detector = PoseDetector(min_detection_confidence=0.5, min_tracking_confidence=0.5)
-    jab_detector = SpeedJab()
-    punch = Punch()
-    technique_list = [punch]
+
     
     root = tk.Tk()
-    App(root, "Pose Detection with GUI", render_pose, detector, technique_list)
+    App(root, "Pose Detection with GUI", detector, [])
 
 if __name__ == "__main__":
     main()
