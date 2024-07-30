@@ -19,15 +19,19 @@ class Jab:
         return selected_landmarks
 
     def normalize_landmarks(self, landmarks):
-        # Normalize landmarks with respect to the left shoulder
+        # Normalize landmarks with respect to the left shoulder using unit normalization
         shoulder = landmarks['LEFT_SHOULDER']
         normalized = {}
         
         for keypoint, point in landmarks.items():
+            vector = np.array([point.x - shoulder.x, point.y - shoulder.y, point.z - shoulder.z])
+            magnitude = np.linalg.norm(vector)
+            if magnitude == 0:  # To handle division by zero
+                magnitude = 1
             normalized[keypoint] = {
-                'x': (point.x - shoulder.x) / shoulder.x,
-                'y': (point.y - shoulder.y) / shoulder.y,
-                'z': (point.z - shoulder.z) / shoulder.z
+                'x': vector[0] / magnitude,
+                'y': vector[1] / magnitude,
+                'z': vector[2] / magnitude
             }
         
         return normalized
@@ -41,12 +45,15 @@ class Jab:
         np.save(filename, self.keypoints)
 
     def extract_features(self):
-        # Extract features (normalized coordinates of left elbow and left wrist)
+        # Extract features (normalized coordinates of left shoulder, left elbow, and left wrist)
         features = []
         for data in self.keypoints:
+            shoulder = data['LEFT_SHOULDER']
             elbow = data['LEFT_ELBOW']
             wrist = data['LEFT_WRIST']
-            features.append([elbow['x'], elbow['y'], elbow['z'], wrist['x'], wrist['y'], wrist['z']])
+            features.append([shoulder['x'], shoulder['y'], shoulder['z'],
+                             elbow['x'], elbow['y'], elbow['z'],
+                             wrist['x'], wrist['y'], wrist['z']])
         return np.array(features)
 
     def train_kmeans(self, n_clusters=2):
@@ -63,7 +70,8 @@ class Jab:
     def infer(self, landmarks):
         selected = self.select_landmarks(landmarks)
         normalized = self.normalize_landmarks(selected)
-        features = np.array([[normalized['LEFT_ELBOW']['x'], normalized['LEFT_ELBOW']['y'], normalized['LEFT_ELBOW']['z'],
+        features = np.array([[normalized['LEFT_SHOULDER']['x'], normalized['LEFT_SHOULDER']['y'], normalized['LEFT_SHOULDER']['z'],
+                              normalized['LEFT_ELBOW']['x'], normalized['LEFT_ELBOW']['y'], normalized['LEFT_ELBOW']['z'],
                               normalized['LEFT_WRIST']['x'], normalized['LEFT_WRIST']['y'], normalized['LEFT_WRIST']['z']]])
         label = self.kmeans.predict(features)[0]
         return label

@@ -8,12 +8,15 @@ data = np.load('src/recorder/data/jab_strikes.npy', allow_pickle=True)
 with open('src/recorder/data/jab_kmeans.pkl', 'rb') as f:
     kmeans = pickle.load(f)
 
-# Extract features (normalized coordinates of left elbow and left wrist)
+# Extract features (normalized coordinates of left shoulder, left elbow, and left wrist)
 features = []
 for record in data:
+    shoulder = record['LEFT_SHOULDER']
     elbow = record['LEFT_ELBOW']
     wrist = record['LEFT_WRIST']
-    features.append([elbow['x'], elbow['y'], elbow['z'], wrist['x'], wrist['y'], wrist['z']])
+    features.append([shoulder['x'], shoulder['y'], shoulder['z'],
+                     elbow['x'], elbow['y'], elbow['z'],
+                     wrist['x'], wrist['y'], wrist['z']])
 features = np.array(features)
 
 # Predict the cluster labels
@@ -29,7 +32,7 @@ cluster_names = ["Non-Jab", "Jab"]
 
 # Plot the elbow keypoints
 for i in range(len(features)):
-    elbow = features[i][:3]
+    elbow = features[i][3:6]  # Extract elbow coordinates for plotting
     cluster_label = labels[i]
     ax.scatter(elbow[0], elbow[1], elbow[2], c=colors[cluster_label], label=cluster_names[cluster_label])
 

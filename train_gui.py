@@ -24,7 +24,7 @@ class App:
 
         self.vid = cv2.VideoCapture(self.video_source)
         self.recording = False
-        self.recording_time = 30  # 10 seconds
+        self.recording_time = 30  # 30 seconds
         self.countdown = 3
         self.punch_count = 0
         self.prev_label = None  # To store the previous label for transition detection
@@ -77,6 +77,7 @@ class App:
     def update_technique_recorder(self, *args):
         selected_technique = self.technique_list_var.get()
         self.technique_recorder = technique_dict[selected_technique]()
+        self.labels = ["Non-Jab", "Jab"]
 
     def start_recording(self):
         self.recording = True
@@ -95,7 +96,6 @@ class App:
     def record(self):
         self.status_label.config(text=f"Recording... {self.recording_time}")
         start_time = time.time()
-        recorded_keypoints = []
 
         while time.time() - start_time < self.recording_time:
             ret, frame = self.vid.read()
@@ -144,12 +144,12 @@ class App:
                     _, landmarks = self.render_pose(self.detector, frame)
                     if landmarks:
                         label = self.technique_recorder.infer(landmarks)
-                        self.current_label = ["Idle", "Moving", "Jab"][label]
+                        self.current_label = self.labels[label]
                         print(f"Inference label: {self.current_label}")  # Debug print
                         cv2.putText(frame, self.current_label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
 
-                        # Punch counter logic: count a punch when transitioning from "Idle" to "Jab"
-                        if self.prev_label == "Idle" and self.current_label == "Jab":
+                        # Punch counter logic: count a punch when transitioning from "Non-Jab" to "Jab"
+                        if self.prev_label == "Non-Jab" and self.current_label == "Jab":
                             self.punch_count += 1
                             self.punch_counter_label.config(text=f"Punch Count: {self.punch_count}")
 
